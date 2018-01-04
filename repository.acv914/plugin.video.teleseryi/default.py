@@ -28,21 +28,32 @@ def listPage(url):
     html = getHTML(urllib.unquote_plus(url))
     soup = BeautifulSoup(html) 
     # Items
+    thumbnail_meta = soup.find('meta', attrs={'property': 'og:image'})
+    try:
+        thumbnail = thumbnail_meta['content']
+    except:
+        thumbnail = "DefaultFolder.png"
+    title_tag = soup.find('title')
+    try:
+        title = title_tag.contents[0]
+    except:
+        title = "no title"
     tab1 = soup.find('div', attrs={'id': 'tabs-1'})
     headings = tab1.findAll('h3')
     iframes = tab1.findAll('iframe')
     hcnt = 0
     for heading in headings:
-        title = heading.contents[0]
+        ititle = heading.contents[0]
         lurl = tab1.findAll('iframe')[hcnt]['src']
         url = get_vidlink(lurl)
-        thumb = "DefaultFolder.png"
-        plot = "plot"
-        time = "time"
-        listitem=xbmcgui.ListItem(title, iconImage="DefaultFolder.png", thumbnailImage=thumb)
-        listitem.setInfo(type="Video", infoLabels={ "Title": title, "Plot" : plot, "Duration" : time })
+        thumb = thumbnail
+        plot = ititle + ' of ' + title
+        #time = "time"
+        listitem=xbmcgui.ListItem(ititle, iconImage=thumb, thumbnailImage=thumb)
+        listitem.setInfo(type="Video", infoLabels={ "Title": title, "Plot" : plot })
         listitem.setPath(url)
         listitem.setProperty("IsPlayable", "true")
+        listitem.setProperty("fanart_image", thumb)
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=listitem)
         hcnt = hcnt + 1        
     return
@@ -104,11 +115,27 @@ def firstPage(url):
     # https://bugs.launchpad.net/beautifulsoup/+bug/838022
     BeautifulSoup.NESTABLE_TAGS['td'] = ['tr', 'table']
     soup = BeautifulSoup(html)
+    thumbs = soup.findAll('div','thumb')
+    lcount = 0
     # Items
     for links in soup.findAll('h2','post-title entry-title'):
+        script = thumbs[lcount].find('script')
+        try:
+            thumbnail_container = script.contents[0]
+        except:
+            thumbnail = "DefaultFolder.png"
+        try:
+            tmatch = re.compile('document.write\(bp_thumbnail_resize\(\"(.+?)\",').findall(thumbnail_container)
+        except:
+            thumbnail = "DefaultFolder.png"
+        try:
+            thumbnail = tmatch[0]
+        except:
+            thumbnail = "DefaultFolder.png"
+        lcount = lcount + 1
         for line in links.findAll('a'):
             try:
-                title = links.find('a').contents[0]
+                title = links.find('a').contents[0].strip()
             except:
                 title = "No title"
             try:
@@ -117,26 +144,7 @@ def firstPage(url):
                 link = None
             if title and link:
                 if BASE_URL in link:
-                    addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), 0)
-
-    # Search
-    #addPosts('Search..', '&search=True')
-    #
-    #
-    # Mga bagong mga post
-    #newerlinks = soup.find('a', 'blog-pager-newer-link')
-    #try:
-    #    title = newerlinks.contents[0]
-    #except:
-    #    title = "Mga Mas Bagong Post"
-    #try:
-    #    link = newerlinks.attrs[1][1]
-    #except:
-    #    link = None
-    #if title and link:
-    #    addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), 1)
-    #
-    # Mga lumang mga post
+                    addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), thumbnail, 0)
     olderlinks = soup.find('a', 'blog-pager-older-link')
     try:
         title = olderlinks.contents[0]
@@ -147,20 +155,22 @@ def firstPage(url):
     except:
         link = None
     if title and link:
-        addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), 1)
+        addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), "DefaultFolder.png", 1)
     return
 
-def addPosts(title, url, first):
- listitem=xbmcgui.ListItem(title, iconImage="DefaultFolder.png")
- listitem.setInfo( type="Video", infoLabels={ "Title": title } )
- if first == 1:
-    xurl = "%s?otherpage=True&url=" % sys.argv[0]
- else:
-    xurl = "%s?next=True&url=" % sys.argv[0]
- xurl = xurl + url
- listitem.setPath(xurl)
- folder = True
- xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=xurl, listitem=listitem, isFolder=folder)
+def addPosts(title, url, thumbnail, first):
+    listitem=xbmcgui.ListItem(title, iconImage=thumbnail)
+    listitem.setInfo( type="Video", infoLabels={ "Title": title, "Plot" : title } )
+    if first == 1:
+        xurl = "%s?otherpage=True&url=" % sys.argv[0]
+    else:
+        xurl = "%s?next=True&url=" % sys.argv[0]
+    xurl = xurl + url
+    #listitem.setInfo(infoLabels={ "Title": title, "Plot" : title })
+    listitem.setPath(xurl)
+    listitem.setProperty("fanart_image", thumbnail)
+    folder = True
+    xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=xurl, listitem=listitem, isFolder=folder)
 
 def search_site():
     encodedSearchString = search()
