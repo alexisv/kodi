@@ -21,7 +21,7 @@
   </extension>
 </addon>
 
-<addon id="plugin.video.teleseryi" name="Teleseryi" version="0.0.1" provider-name="acv914">
+<addon id="plugin.video.teleseryi" name="Teleseryi" version="0.0.2" provider-name="acv914">
   <requires>
     <import addon="xbmc.python" version="2.1.0"/>
     <import addon="script.module.beautifulsoup" version="3.2.0"/>
