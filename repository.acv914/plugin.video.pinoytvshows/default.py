@@ -58,6 +58,7 @@ def get_vidlink(url):
     match_linksharetv = re.compile('http://www.linkshare.tv/mp4/\?url').findall(url)
     match_dailymotion = re.compile('www.dailymotion.com').findall(url)
     match_videorss = re.compile('http://videorss.net/mp4/\?url').findall(url)
+    match_youtube = re.compile('www.youtube.com').findall(url)
     if match_pinoytvshows:
         vidlink = get_vidlink_pinoytvshows(url)
     if match_linksharetv:
@@ -66,6 +67,8 @@ def get_vidlink(url):
         vidlink = get_vidlink_dailymotion(url)
     if match_videorss:
         vidlink = get_vidlink_linksharetv(url)
+    if match_youtube:
+        vidlink = get_vidlink_youtube(url)
     return vidlink
 
 def get_vidlink_pinoytvshows(url):
@@ -103,6 +106,180 @@ def get_vidlink_dailymotion(url):
     elif matchLD:
         vidlink = urllib.unquote_plus(matchLD[0]).replace("\\", "")
     return vidlink
+
+def get_vidlink_youtube(url):
+    vidlink = ""
+    if (url.find("youtube") > -1) and (url.find("playlists") > -1):
+        playlistid=re.compile('playlists/(.+?)\?v').findall(url)
+        vidlink="plugin://plugin.video.youtube?path=/root/video&action=play_all&playlist="+playlistid[0]
+    elif (url.find("youtube") > -1) and (url.find("list=") > -1):
+        playlistid=re.compile('videoseries\?list=(.+?)&').findall(url+"&")
+        if (len(playlistid) > 0):
+            vidlink="plugin://plugin.video.youtube?path=/root/video&action=play_all&playlist="+playlistid[0]
+        else:
+            playlistid = re.compile('list=(.+?)$').findall(url)
+            vidlink="plugin://plugin.video.youtube?path=/root/video&action=play_all&playlist="+playlistid[0]
+    elif (url.find("youtube") > -1) and (url.find("/p/") > -1):
+        playlistid=re.compile('/p/(.+?)\?').findall(url)
+        vidlink="plugin://plugin.video.youtube?path=/root/video&action=play_all&playlist="+playlistid[0]
+    elif (url.find("youtube") > -1) and (url.find("/embed/") > -1):
+        playlistid=re.compile('/embed/(.+?)\?').findall(url+"?")
+        vidlink=getYoutube(playlistid[0])
+        if vidlink == "":
+            vidlink="plugin://plugin.video.youtube/?action=play_video&videoid="+playlistid[0]
+    elif (url.find("youtube") > -1):
+        match=re.compile('(youtu\.be\/|youtube-nocookie\.com\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v|user)\/))([^\?&"\'>]+)').findall(url)
+        if(len(match) == 0):
+            match=re.compile('http://www.youtube.com/watch\?v=(.+?)&dk;').findall(url)
+        if(len(match) > 0):
+            lastmatch = match[0][len(match[0])-1].replace('v/','')
+        vidlink=getYoutube(lastmatch[0])
+        if vidlink == "":
+            vidlink="plugin://plugin.video.youtube/?action=play_video&videoid="+lastmatch[0]
+    return vidlink   
+
+def getYoutube(code):
+    yturl = 'http://www.youtube.com/watch?v='+code+'&fmt=18'
+    link = getHTML(yturl)
+    #link = link.encode("UTF-8")
+                            
+    if len(re.compile('shortlink" href="http://youtu.be/(.+?)"').findall(link)) == 0:
+        if len(re.compile('\'VIDEO_ID\': "(.+?)"').findall(link)) == 0:
+            yturl2 = 'http://www.youtube.com/get_video_info?video_id='+code+'&asv=3&el=detailpage&hl=en_US'
+            link = getHTML(yturl2)
+            link = link.encode("UTF-8")
+                            
+    flashvars = extractFlashVars(link)
+    if len(flashvars) == 0:
+        return ""
+
+    links = {}
+
+    for url_desc in flashvars[u"url_encoded_fmt_stream_map"].split(u","):
+        url_desc_map = cgi.parse_qs(url_desc)
+        if not (url_desc_map.has_key(u"url") or url_desc_map.has_key(u"stream")):
+            continue
+
+        key = int(url_desc_map[u"itag"][0])
+        url = u""
+        if url_desc_map.has_key(u"url"):
+            url = urllib.unquote(url_desc_map[u"url"][0])
+        elif url_desc_map.has_key(u"stream"):
+            url = urllib.unquote(url_desc_map[u"stream"][0])
+
+        if url_desc_map.has_key(u"sig"):
+            url = url + u"&signature=" + url_desc_map[u"sig"][0]
+        links[key] = url
+    highResoVid=selectVideoQuality(links)
+    return highResoVid
+
+def selectVideoQuality(links):
+    link = links.get
+    video_url = ""
+    fmt_value = {
+                                5: "240p h263 flv container",
+                                18: "360p h264 mp4 container | 270 for rtmpe?",
+                                22: "720p h264 mp4 container",
+                                26: "???",
+                                33: "???",
+                                34: "360p h264 flv container",
+                                35: "480p h264 flv container",
+                                37: "1080p h264 mp4 container",
+                                38: "720p vp8 webm container",
+                                43: "360p h264 flv container",
+                                44: "480p vp8 webm container",
+                                45: "720p vp8 webm container",
+                                46: "520p vp8 webm stereo",
+                                59: "480 for rtmpe",
+                                78: "seems to be around 400 for rtmpe",
+                                82: "360p h264 stereo",
+                                83: "240p h264 stereo",
+                                84: "720p h264 stereo",
+                                85: "520p h264 stereo",
+                                100: "360p vp8 webm stereo",
+                                101: "480p vp8 webm stereo",
+                                102: "720p vp8 webm stereo",
+                                120: "hd720",
+                                121: "hd1080"
+    }
+    hd_quality = 1
+
+    # SD videos are default, but we go for the highest res
+    if (link(35)):
+        video_url = link(35)
+    elif (link(59)):
+        video_url = link(59)
+    elif link(44):
+        video_url = link(44)
+    elif (link(78)):
+        video_url = link(78)
+    elif (link(34)):
+        video_url = link(34)
+    elif (link(43)):
+        video_url = link(43)
+    elif (link(26)):
+        video_url = link(26)
+    elif (link(18)):
+        video_url = link(18)
+    elif (link(33)):
+        video_url = link(33)
+    elif (link(5)):
+        video_url = link(5)
+
+    if hd_quality > 1:    # <-- 720p
+        if (link(22)):
+            video_url = link(22)
+        elif (link(45)):
+            video_url = link(45)
+        elif link(120):
+            video_url = link(120)
+    if hd_quality > 2:
+        if (link(37)):
+            video_url = link(37)
+        elif link(121):
+            video_url = link(121)
+
+    if link(38) and False:
+        video_url = link(38)
+    for fmt_key in links.iterkeys():
+
+        if link(int(fmt_key)):
+            text = repr(fmt_key) + " - "
+            if fmt_key in fmt_value:
+                text += fmt_value[fmt_key]
+            else:
+                text += "Unknown"
+
+            if (link(int(fmt_key)) == video_url):
+                text += "*"
+            else:
+                print "- Missing fmt_value: " + repr(fmt_key)
+    video_url += " | " + 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.9.0.3) Gecko/2008092417 Firefox/3.0.3'
+    return video_url
+
+def extractFlashVars(data):
+    found = False
+    flashvars = ""
+    for line in data.split("\n"):
+        index = line.find("ytplayer.config =")
+        if index != -1:
+            cfgline = line.find("url_encoded_fmt_stream_map")
+            if cfgline != -1:
+                found = True
+                p1 = line.find("=", (index-3))
+                p2 = line.rfind(";")
+                if p1 <= 0 or p2 <= 0:
+                    continue
+                data = line[p1 + 1:p2]
+                break
+    if found:
+        data=data.split(";(function()",1)[0]
+        try:
+            data = json.loads(data)
+        except:
+            return ""
+        flashvars = data["args"]
+    return flashvars
 
 def get_vidlink_linksharetv(url):
     urlmatch = re.search('(?<=\=).+', url)
