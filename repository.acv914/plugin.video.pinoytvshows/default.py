@@ -1,5 +1,6 @@
 import xbmc
 import xbmcgui
+import xbmcaddon
 import xbmcplugin
 import re
 import urllib2
@@ -34,20 +35,32 @@ def listPage(url):
     #tab1 = soup.find('div', attrs={'id': 'tabs-1'})
     #headings = tab1.findAll('h3')
     #iframes = tab1.findAll('iframe')
+    thumbnail_meta = soup.find('meta', attrs={'property': 'og:image'})
+    try:
+        thumbnail = thumbnail_meta['content']
+    except:
+        thumbnail = "DefaultFolder.png"
+    title_tag = soup.find('title')
+    try:
+        title = title_tag.contents[0]
+    except:
+        title = "no title"
+    #notify(thumbnail)
     iframes = soup.findAll('iframe')
     hcnt = 0
     for iframe in iframes:
         partcnt = hcnt + 1
-        title = "Part " + str(partcnt)
+        ititle = "Part " + str(partcnt)
         lurl = iframe['src']
         url = get_vidlink(lurl)
-        thumb = "DefaultFolder.png"
-        plot = "plot"
-        time = "time"
-        listitem=xbmcgui.ListItem(title, iconImage="DefaultFolder.png", thumbnailImage=thumb)
-        listitem.setInfo(type="Video", infoLabels={ "Title": title, "Plot" : plot, "Duration" : time })
+        thumb = thumbnail
+        plot = ititle + ' of ' + title
+        #time = "time"
+        listitem=xbmcgui.ListItem(ititle, iconImage=thumb, thumbnailImage=thumb)
+        listitem.setInfo(type="Video", infoLabels={ "Title": title, "Plot" : plot })
         listitem.setPath(url)
         listitem.setProperty("IsPlayable", "true")
+        listitem.setProperty("fanart_image", thumb)
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=listitem)
         hcnt = hcnt + 1        
     return
@@ -61,6 +74,9 @@ def get_vidlink(url):
     match_youtube = re.compile('www.youtube.com').findall(url)
     if match_pinoytvshows:
         vidlink = get_vidlink_pinoytvshows(url)
+        match_youtube_in = re.compile('www.youtube.com').findall(vidlink)
+        if match_youtube_in:
+            vidlink = get_vidlink_youtube(vidlink)
     if match_linksharetv:
         vidlink = get_vidlink_linksharetv(url)
     if match_dailymotion:
@@ -128,14 +144,25 @@ def get_vidlink_youtube(url):
         if vidlink == "":
             vidlink="plugin://plugin.video.youtube/?action=play_video&videoid="+playlistid[0]
     elif (url.find("youtube") > -1):
-        match=re.compile('(youtu\.be\/|youtube-nocookie\.com\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v|user)\/))([^\?&"\'>]+)').findall(url)
-        if(len(match) == 0):
-            match=re.compile('http://www.youtube.com/watch\?v=(.+?)&dk;').findall(url)
-        if(len(match) > 0):
-            lastmatch = match[0][len(match[0])-1].replace('v/','')
-        vidlink=getYoutube(lastmatch[0])
+        #match=re.compile('(youtu\.be\/|youtube-nocookie\.com\/|youtube\.com\/(watch\?(.*&)?v=|(embed|v|user)\/))([^\?&"\'>]+)').findall(url)
+        #if(len(match) == 0):
+        #    match=re.compile('http://www.youtube.com/watch\?v=(.+?)&dk;').findall(url)
+        #if(len(match) == 0):
+        #    match=re.compile('http://www.youtube.com/watch\?v=(.+)').findall(url)
+        #if(len(match) > 0):
+        #    lastmatch = match[0][len(match[0])-1].replace('v/','')
+            #lastmatch = match[0][len(match[0])-1]
+        #vidlink=getYoutube(lastmatch[0])
+        match=re.compile('https://www.youtube.com/watch\?v=(.+)').findall(url)
+        #if(len(match) > 0):
+            #lastmatch = match[0][len(match[0])-1].replace('v/','')
+            #msg = match[0]
+            #notify(msg)
+        vidlink=getYoutube(match[0])
+        #notify(vidlink)
         if vidlink == "":
-            vidlink="plugin://plugin.video.youtube/?action=play_video&videoid="+lastmatch[0]
+            #vidlink="plugin://plugin.video.youtube/?action=play_video&videoid="+lastmatch[0]
+            vidlink="plugin://plugin.video.youtube/?action=play_video&videoid="+match[0]
     return vidlink   
 
 def getYoutube(code):
@@ -296,20 +323,45 @@ def firstPage(url):
     # https://bugs.launchpad.net/beautifulsoup/+bug/838022
     BeautifulSoup.NESTABLE_TAGS['td'] = ['tr', 'table']
     soup = BeautifulSoup(html)
+
+    for article in soup.findAll('article','latestPost excerpt layout-1'):
+        h2 = article.find('h2', 'title front-view-title')
+        try:
+            title = h2.find('a')['title']
+        except:
+            title = "No title"
+        try:
+            link = h2.find('a')['href']
+        except:
+            link = None
+        try:
+            div = article.find('div','featured-thumbnail')
+            try:
+                thumbnail = div.find('img')['data-layzr']
+            except:
+                thumbnail = "DefaultFolder.png"
+        except:
+            div = None
+            thumbnail = "DefaultFolder.png"
+
+        if title and link:
+            if BASE_URL in link:
+                addPosts(title, link, thumbnail, 0)
+
     # Items
-    for links in soup.findAll('h2','title front-view-title'):
-        for line in links.findAll('a'):
-            try:
-                title = links.find('a').contents[0]
-            except:
-                title = "No title"
-            try:
-                link = links.find('a')['href']
-            except:
-                link = None
-            if title and link:
-                if BASE_URL in link:
-                    addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), 0)
+    #for links in soup.findAll('h2','title front-view-title'):
+    #    for line in links.findAll('a'):
+    #        try:
+    #            title = links.find('a').contents[0]
+    #        except:
+    #            title = "No title"
+    #        try:
+    #            link = links.find('a')['href']
+    #        except:
+    #            link = None
+    #        if title and link:
+    #            if BASE_URL in link:
+    #                addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), 0)
 
     # Search
     #addPosts('Search..', '&search=True')
@@ -336,21 +388,30 @@ def firstPage(url):
     except:
         link = None
     if title and link:
-        addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), 1)
+        addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), "DefaultFolder.png", 1)
     return
 
-def addPosts(title, url, first):
- listitem=xbmcgui.ListItem(title, iconImage="DefaultFolder.png")
- listitem.setInfo( type="Video", infoLabels={ "Title": title } )
- if first == 1:
-    xurl = "%s?otherpage=True&url=" % sys.argv[0]
- else:
-    xurl = "%s?next=True&url=" % sys.argv[0]
- xurl = xurl + url
- listitem.setPath(xurl)
- folder = True
- xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=xurl, listitem=listitem, isFolder=folder)
+def addPosts(title, url, thumbnail, first):
+    listitem=xbmcgui.ListItem(title, iconImage=thumbnail)
+    listitem.setInfo( type="Video", infoLabels={ "Title": title, "Plot" : title } )
+    if first == 1:
+        xurl = "%s?otherpage=True&url=" % sys.argv[0]
+    else:
+        xurl = "%s?next=True&url=" % sys.argv[0]
+    xurl = xurl + url
+    #listitem.setInfo(infoLabels={ "Title": title, "Plot" : title })
+    listitem.setPath(xurl)
+    listitem.setProperty("fanart_image", thumbnail)
+    folder = True
+    xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=xurl, listitem=listitem, isFolder=folder)
 
+def notify(msg):
+    __addon__ = xbmcaddon.Addon()
+    __addonname__ = __addon__.getAddonInfo('name')
+    __icon__ = __addon__.getAddonInfo('icon')
+    xbmc.executebuiltin('Notification(%s, %s, %d, %s)'%(__addonname__, msg, 4000, __icon__))
+    return 0
+ 
 def search_site():
     encodedSearchString = search()
     if not encodedSearchString == "":

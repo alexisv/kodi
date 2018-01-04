@@ -1,3 +1,5 @@
+v0.0.4
+ - 1/4/2018 fixed firstPage() and listPage() to include respective thumbnail, title, plot and fanart.
 v0.0.3
  - 1/4/2018 youtube links now supported
  v0.0.2
