@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon provider-name="acv914" version="0.0.1" name="acv914 Add-ons" id="repository.acv914.xbmc.addons">
   <extension name="acv914 Add-ons" point="xbmc.addon.repository">
-        <info compressed="false">http://acv914-xbmc.googlecode.com/git/addons.xml</info>
-        <checksum>http://acv914-xbmc.googlecode.com/git/addons.xml.md5</checksum>
-        <datadir zip="false">http://acv914-xbmc.googlecode.com/git/</datadir>
+        <info compressed="false">https://raw.githubusercontent.com/alexisv/kodi/master/repository.acv914/addons.xml</info>
+        <checksum>https://raw.githubusercontent.com/alexisv/kodi/master/repository.acv914/addons.xml.md5</checksum>
+        <datadir zip="false">https://raw.githubusercontent.com/alexisv/kodi/master/repository.acv914/</datadir>
   </extension>
   <extension point="xbmc.addon.metadata">
-        <summary>XBMC Plugins</summary>
-        <description>Install XBMC Plugins</description>
+        <summary>acv914 Kodi Plugins</summary>
+        <description>Install acv914 Kodi Plugins</description>
         <disclaimer>No guarantee and no warranty</disclaimer>
         <language>en</language>
         <platform>all</platform>
