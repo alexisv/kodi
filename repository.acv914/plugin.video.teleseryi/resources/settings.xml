@@ -1,0 +1,5 @@
+<settings>
+<category label="Play Next">
+  <setting id="auto-play-next" type="text" label="Yes" default="" visible="false"/>
+</category>
+</settings>

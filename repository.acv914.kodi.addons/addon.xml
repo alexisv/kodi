@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon provider-name="acv914" version="0.0.1" name="acv914 Add-ons" id="repository.acv914.xbmc.addons">
+  <extension name="acv914 Add-ons" point="xbmc.addon.repository">
+        <info compressed="false">http://acv914-xbmc.googlecode.com/git/addons.xml</info>
+        <checksum>http://acv914-xbmc.googlecode.com/git/addons.xml.md5</checksum>
+        <datadir zip="false">http://acv914-xbmc.googlecode.com/git/</datadir>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+        <summary>XBMC Plugins</summary>
+        <description>Install XBMC Plugins</description>
+        <disclaimer>No guarantee and no warranty</disclaimer>
+        <language>en</language>
+        <platform>all</platform>
+  </extension>
+</addon>
+
