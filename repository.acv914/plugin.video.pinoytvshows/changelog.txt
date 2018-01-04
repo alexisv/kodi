@@ -1,2 +1,4 @@
+v0.0.2
+ - 1/3/2018 bumping version # to check if auto-update works
 v0.0.1
  - 1/1/2018 First try!
