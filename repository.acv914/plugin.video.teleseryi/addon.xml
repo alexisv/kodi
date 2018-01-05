@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.teleseryi" name="Teleseryi" version="0.0.3" provider-name="acv914">
+<addon id="plugin.video.teleseryi" name="Teleseryi" version="0.0.4" provider-name="acv914">
   <requires>
     <import addon="xbmc.python" version="2.1.0"/>
     <import addon="script.module.beautifulsoup" version="3.2.0"/>
@@ -8,6 +8,10 @@
         <provides>video</provides>
   </extension>
   <extension point="xbmc.addon.metadata">
+    <assets>
+        <icon>icon.png</icon>
+        <fanart>icon.png</fanart>
+    </assets>
     <summary lang="en">Kodi video add-on for Pinoy TV Shows and Movies</summary>
     <description lang="en">Kodi video add-on for Pinoy TV Shows and Movies</description>
     <disclaimer lang="en"></disclaimer>

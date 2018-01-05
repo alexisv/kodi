@@ -4,7 +4,7 @@ import xbmcplugin
 import re
 import urllib2
 import urllib
-import math
+import json
 
 BASE_URL = "http://www.teleseryi.info"
  
@@ -72,32 +72,35 @@ def get_vidlink(url):
     return vidlink
 
 def get_vidlink_dailymotion(url):
-    match=re.compile('http://www.dailymotion.com/embed/video/(.+?)\?').findall(url)
-    if(len(match) == 0):
-        match=re.compile('http://www.dailymotion.com/video/(.+?)&dk;').findall(url+"&dk;")
-    if(len(match) == 0):
-        match=re.compile('http://www.dailymotion.com/swf/(.+?)\?').findall(url)
-    if(len(match) == 0):
-        match=re.compile('http://www.dailymotion.com/embed/video/(.+?)$').findall(url)
-    link = 'http://www.dailymotion.com/embed/video/'+str(match[0])
-    req = get_page(link)
-    req = req.encode("UTF-8")
-    matchFullHD = re.compile('"stream_h264_hd1080_url":"(.+?)"', re.DOTALL).findall(req)
-    matchHD = re.compile('"stream_h264_hd_url":"(.+?)"', re.DOTALL).findall(req)
-    matchHQ = re.compile('"stream_h264_hq_url":"(.+?)"', re.DOTALL).findall(req)
-    matchSD = re.compile('"stream_h264_url":"(.+?)"', re.DOTALL).findall(req)
-    matchLD = re.compile('"stream_h264_ld_url":"(.+?)"', re.DOTALL).findall(req)
-    maxVideoQuality = "1080p"
-    if matchFullHD and maxVideoQuality == "1080p":
-        vidlink = urllib.unquote_plus(matchFullHD[0]).replace("\\", "")
-    elif matchHD and (maxVideoQuality == "720p" or maxVideoQuality == "1080p"):
-        vidlink = urllib.unquote_plus(matchHD[0]).replace("\\", "")
-    elif matchHQ:
-        vidlink = urllib.unquote_plus(matchHQ[0]).replace("\\", "")
-    elif matchSD:
-        vidlink = urllib.unquote_plus(matchSD[0]).replace("\\", "")
-    elif matchLD:
-        vidlink = urllib.unquote_plus(matchLD[0]).replace("\\", "")
+    vidlink = ''
+	# check if URL starts with just // and not the usual http: or https:; add 'http' accordingly
+    dblslshpat = re.compile("//")
+    if (dblslshpat.match(url, 0) > -1):
+        url = "http:"+url
+    html = getHTML(url)
+    soup = BeautifulSoup(html)
+    scripts = soup.findAll('script')
+    scode = scripts[8].contents[0]
+    matchconfig = re.compile('var config = (\{.+?\})\;').findall(scripts[8].contents[0])
+    json_string = matchconfig[0]
+    parsed_json = json.loads(json_string)
+    fileurl = parsed_json['metadata']['qualities']['auto'][0]['url']
+    lastquality = 0
+    for q in parsed_json['metadata']['qualities']:
+        if q == 'auto':
+            continue
+        if int(lastquality) > int(q):
+            continue
+        else:
+            try:
+                fileurl = parsed_json['metadata']['qualities'][q][1]['url']
+            except:
+                try:
+                    fileurl = parsed_json['metadata']['qualities'][q][0]['url']
+                except:
+                    continue
+            lastquality = int(q)
+    vidlink = fileurl
     return vidlink
 
 def get_vidlink_linksharetv(url):
@@ -166,40 +169,10 @@ def addPosts(title, url, thumbnail, first):
     else:
         xurl = "%s?next=True&url=" % sys.argv[0]
     xurl = xurl + url
-    #listitem.setInfo(infoLabels={ "Title": title, "Plot" : title })
     listitem.setPath(xurl)
     listitem.setProperty("fanart_image", thumbnail)
     folder = True
     xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=xurl, listitem=listitem, isFolder=folder)
-
-def search_site():
-    encodedSearchString = search()
-    if not encodedSearchString == "":
-        url = 'http://www.pinkbike.com/video/search/?q=' + encodedSearchString
-        listPage(url)
-    else:
-        firstPage(BASE_URL)
-    return
-
-def search():
-    searchString = unikeyboard("", 'Search PinkBike.com')
-    if searchString == "":
-        xbmcgui.Dialog().ok('PinkBike.com','Missing text')
-    elif searchString:
-        dialogProgress = xbmcgui.DialogProgress()
-        dialogProgress.create('PinkBike.com', 'Searching for: ' , searchString)
-        #The XBMC onscreen keyboard outputs utf-8 and this need to be encoded to unicode
-    encodedSearchString = urllib.quote_plus(searchString.decode("utf_8").encode("raw_unicode_escape"))
-    return encodedSearchString
-
-#From old undertexter.se plugin    
-def unikeyboard(default, message):
-    keyboard = xbmc.Keyboard(default, message)
-    keyboard.doModal()
-    if (keyboard.isConfirmed()):
-        return keyboard.getText()
-    else:
-        return ""
 
 #FROM plugin.video.youtube.beta  -- converts the request url passed on by xbmc to our plugin into a dict  
 def getParameters(parameterString):
