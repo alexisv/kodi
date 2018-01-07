@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.teleseryi" name="Teleseryi" version="0.0.4" provider-name="acv914">
+<addon id="plugin.video.teleseryi" name="Teleseryi" version="0.0.5" provider-name="acv914">
   <requires>
     <import addon="xbmc.python" version="2.1.0"/>
     <import addon="script.module.beautifulsoup" version="3.2.0"/>
   </requires>
-  <extension point="xbmc.python.pluginsource" library="default.py">
+  <extension point="xbmc.python.pluginsource" library="addon.py">
         <provides>video</provides>
   </extension>
   <extension point="xbmc.addon.metadata">

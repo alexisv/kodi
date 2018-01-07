@@ -1,12 +1,17 @@
 import xbmc
 import xbmcgui
+import xbmcaddon
 import xbmcplugin
 import re
 import urllib2
 import urllib
+import urlparse
 import json
 
 BASE_URL = "http://www.teleseryi.info"
+addon_handle = sys.argv[1]
+args = urlparse.parse_qs(sys.argv[2][1:])
+thebase = sys.argv[0]
  
 from BeautifulSoup import MinimalSoup as BeautifulSoup, SoupStrainer
 
@@ -27,6 +32,7 @@ def getHTML(url):
 def listPage(url):
     html = getHTML(urllib.unquote_plus(url))
     soup = BeautifulSoup(html) 
+    links = []
     # Items
     thumbnail_meta = soup.find('meta', attrs={'property': 'og:image'})
     try:
@@ -43,19 +49,29 @@ def listPage(url):
     iframes = tab1.findAll('iframe')
     hcnt = 0
     for heading in headings:
-        ititle = heading.contents[0]
         lurl = tab1.findAll('iframe')[hcnt]['src']
         url = get_vidlink(lurl)
+        links.append(str(url))
+        hcnt = hcnt + 1
+    if (len(links) > 1):
+        durl = build_url({'url': links, 'mode': 'playAllVideos', 'foldername': title, 'thumbnail': thumbnail, 'title': title})
+        itemname = 'Play All Parts'
+        li = xbmcgui.ListItem(itemname, iconImage=thumbnail)
+        li.setInfo(type="Video",infoLabels={"Title": title, "Plot" : "All parts of" + title})
+        li.setProperty('fanart_image', thumbnail)
+        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=durl, listitem=li)
+    hcnt = 0
+    for heading in headings:
+        ititle = heading.contents[0]
+        url = links[hcnt]
         thumb = thumbnail
         plot = ititle + ' of ' + title
-        #time = "time"
         listitem=xbmcgui.ListItem(ititle, iconImage=thumb, thumbnailImage=thumb)
         listitem.setInfo(type="Video", infoLabels={ "Title": title, "Plot" : plot })
-        listitem.setPath(url)
         listitem.setProperty("IsPlayable", "true")
         listitem.setProperty("fanart_image", thumb)
         xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=listitem)
-        hcnt = hcnt + 1        
+        hcnt = hcnt + 1
     return
 
 def get_vidlink(url):
@@ -174,6 +190,29 @@ def addPosts(title, url, thumbnail, first):
     folder = True
     xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=xurl, listitem=listitem, isFolder=folder)
 
+def play_all_videos(videoType, videoIds, thumbnail, title):
+    notify("Playing all parts.")
+    cntr = 1
+    totl = len(videoIds)
+    xbmcPlayer = xbmc.Player()
+    playlist = xbmc.PlayList( xbmc.PLAYLIST_VIDEO )
+    playlist.clear()
+    for videoId in videoIds:
+        list_title = title +" ["+ str(cntr) +" of "+ str(totl) +"]"
+        listitem = xbmcgui.ListItem(list_title)
+        listitem.setThumbnailImage(thumbnail)
+        playlist.add(videoId, listitem)   
+        cntr = cntr + 1
+    xbmcPlayer.play(playlist)
+    return 0
+
+def notify(msg):
+    __addon__ = xbmcaddon.Addon()
+    __addonname__ = __addon__.getAddonInfo('name')
+    __icon__ = __addon__.getAddonInfo('icon')
+    xbmc.executebuiltin('Notification(%s, %s, %d, %s)'%(__addonname__, msg, 4000, __icon__))
+    return 0
+
 #FROM plugin.video.youtube.beta  -- converts the request url passed on by xbmc to our plugin into a dict  
 def getParameters(parameterString):
     commands = {}
@@ -186,17 +225,29 @@ def getParameters(parameterString):
             commands[name] = value
     return commands
 
+def build_url(query):
+    return thebase + '?' + urllib.urlencode(query)
+
 if (__name__ == "__main__" ):
     if (not sys.argv[2]):
         firstPage(BASE_URL)
     else:
         params = getParameters(sys.argv[2])
         get = params.get
-        if (get("search")):
-            search_site()
+        mode = ''
+        mode = get("mode")
         if (get("next")) and not (get("search")):
             nextPage(params)
-        if (get("otherpage")):
+        if (get("otherpage")) and not (get("mode")):
             firstPage(get("url"))
+        if (mode == "playAllVideos"):
+            thebase = sys.argv[0]
+            foldername = args['foldername'][0]
+            url = args['url'][0]
+            thumbnail = args['thumbnail'][0]
+            title = args['title'][0]
+            url = url.replace("[","").replace("]","").replace("'","")
+            urls = url.split(", ")
+            play_all_videos(thebase,urls,thumbnail,title)
 
 xbmcplugin.endOfDirectory(int(sys.argv[1]))

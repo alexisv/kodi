@@ -1,3 +1,5 @@
+v0.0.5
+ - 1/6/2018 added play all video parts function.
 v0.0.4
  - 1/4/2018 fixed firstPage() and listPage() to include respective thumbnail, title, plot and fanart.
 v0.0.3
