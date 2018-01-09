@@ -1,3 +1,5 @@
+v0.0.6
+ - 1/8/2018 getHTML now mimics Mozilla Firefox as User-Agent
 v0.0.5
  - 1/6/2018 added function to play all video parts.
 v0.0.4

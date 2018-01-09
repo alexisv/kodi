@@ -12,14 +12,15 @@ BASE_URL = "http://www.teleseryi.info"
 addon_handle = sys.argv[1]
 args = urlparse.parse_qs(sys.argv[2][1:])
 thebase = sys.argv[0]
- 
+
 from BeautifulSoup import MinimalSoup as BeautifulSoup, SoupStrainer
 
 def getHTML(url):
         try:
             print 'getHTML :: url = ' + url
-            req = urllib2.Request(url)
-            response = urllib2.urlopen(req)
+            req = urllib2.build_opener()
+            req.addheaders = [('User-Agent', 'Mozilla/5.0 (X11; U; Linux i686) Gecko/20071127 Firefox/2.0.0.11')]
+            response = req.open(url)
             link = response.read()
             response.close()
         except urllib2.HTTPError, e:
@@ -31,7 +32,7 @@ def getHTML(url):
 
 def listPage(url):
     html = getHTML(urllib.unquote_plus(url))
-    soup = BeautifulSoup(html) 
+    soup = BeautifulSoup(html)
     links = []
     # Items
     thumbnail_meta = soup.find('meta', attrs={'property': 'og:image'})
@@ -123,7 +124,7 @@ def get_vidlink_linksharetv(url):
     urlmatch = re.search('(?<=\=).+', url)
     vidlink = urlmatch.group(0)
     return vidlink
-    
+
 def nextPage(params):
     get = params.get
     url = get("url")
@@ -201,7 +202,7 @@ def play_all_videos(videoType, videoIds, thumbnail, title):
         list_title = title +" ["+ str(cntr) +" of "+ str(totl) +"]"
         listitem = xbmcgui.ListItem(list_title)
         listitem.setThumbnailImage(thumbnail)
-        playlist.add(videoId, listitem)   
+        playlist.add(videoId, listitem)
         cntr = cntr + 1
     xbmcPlayer.play(playlist)
     return 0
@@ -213,11 +214,10 @@ def notify(msg):
     xbmc.executebuiltin('Notification(%s, %s, %d, %s)'%(__addonname__, msg, 4000, __icon__))
     return 0
 
-#FROM plugin.video.youtube.beta  -- converts the request url passed on by xbmc to our plugin into a dict  
 def getParameters(parameterString):
     commands = {}
     splitCommands = parameterString[parameterString.find('?')+1:].split('&')
-    for command in splitCommands: 
+    for command in splitCommands:
         if (len(command) > 0):
             splitCommand = command.split('=')
             name = splitCommand[0]
