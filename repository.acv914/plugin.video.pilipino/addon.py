@@ -149,6 +149,8 @@ def firstPage_pinoytvshows(url):
 
 def firstPage_magtvnaph(url):
     firstmatch = re.compile('www.magtvnaph.com$').findall(url)
+    absmatch = re.compile('Abs-cbn').findall(url)
+    gmamatch = re.compile('/search/label/Gma%207$').findall(url)
     if firstmatch:
         gma_url = 'http://www.magtvnaph.com/search/label/Gma%207'
         abs_url = 'http://www.magtvnaph.com/search/label/Abs-cbn'
@@ -158,7 +160,31 @@ def firstPage_magtvnaph(url):
         html = getHTML(urllib.unquote_plus(url))
         # https://bugs.launchpad.net/beautifulsoup/+bug/838022
         BeautifulSoup.NESTABLE_TAGS['td'] = ['tr', 'table']
+        notify(html)
         soup = BeautifulSoup(str(html))
+
+        for article in soup.findAll('article','post hentry'):
+                h2 = article.find('h2', 'post-title entry-title')
+                try:
+                    title = h2.find('a').contents[0].strip()
+                except:
+                    title = "No title"
+                try:
+                    link = h2.find('a')['href']
+                except:
+                    link = None
+                try:
+                    div = article.find('div','featured-thumbnail')
+                    try:
+                        thumbnail = div.find('img')['data-layzr']
+                    except:
+                        thumbnail = "DefaultFolder.png"
+                except:
+                    div = None
+                    thumbnail = "DefaultFolder.png"
+                if title and link:
+                    addPosts(title, link, thumbnail, 0)
+
     return
 
 def listPage_teleseryi(url):
