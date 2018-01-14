@@ -1,5 +1,6 @@
 import xbmc
 import xbmcgui
+import xbmcvfs
 import xbmcaddon
 import xbmcplugin
 import re
@@ -16,6 +17,7 @@ thebase = sys.argv[0]
 magtvnaph_url = 'http://www.magtvnaph.com'
 pinoytvshows_url = 'https://www.pinoytvshows.me'
 teleseryi_url = 'http://www.teleseryi.info'
+pinoychannelhd_url = 'https://pinoychannelhd.su'
 
 def getHTML(url):
         try:
@@ -27,15 +29,14 @@ def getHTML(url):
             response.close()
         except urllib2.HTTPError, e:
             print "HTTP error: %d" % e.code
-            notify("HTTP error: %d" % e.code)
         except urllib2.URLError, e:
             print "Network error: %s" % e.reason.args[1]
-            notify("Network error: %s" % e.reason.args[1])
         else:
             return link
 
 def firstPage():
     addPosts(str("Mag TV na"), magtvnaph_url, "DefaultFolder.png", 1)
+    addPosts(str("Pinoy Channel HD"), pinoychannelhd_url, "DefaultFolder.png", 1)
     addPosts(str("Pinoy TV Shows"), pinoytvshows_url, "DefaultFolder.png", 1)
     addPosts(str("Teleseryi"), teleseryi_url, "DefaultFolder.png", 1)
     return
@@ -44,24 +45,30 @@ def sitePage(url):
     match_teleseryi = re.compile("teleseryi.info").findall(url)
     match_pinoytvshows = re.compile("pinoytvshows.me").findall(url)
     match_magtvnaph = re.compile("magtvnaph.com").findall(url)
+    match_pinoychannelhd = re.compile("pinoychannelhd.su").findall(url)
     if match_teleseryi:
         firstPage_teleseryi(url)
     if match_pinoytvshows:
         firstPage_pinoytvshows(url)
     if match_magtvnaph:
         firstPage_magtvnaph(url)
+    if match_pinoychannelhd:
+        firstPage_pinoychannelhd(url)
     return
 
 def listPage(url):
     match_teleseryi = re.compile("teleseryi.info").findall(url)
     match_pinoytvshows = re.compile("pinoytvshows.me").findall(url)
     match_magtvnaph = re.compile("magtvnaph.com").findall(url)
+    match_pinoychannelhd = re.compile("pinoychannelhd.su").findall(url)
     if match_teleseryi:
         listPage_teleseryi(url)
     if match_pinoytvshows:
         listPage_pinoytvshows(url)
     if match_magtvnaph:
         listPage_magtvnaph(url)
+    if match_pinoychannelhd:
+        listPage_pinoychannelhd(url)
     return
 
 def firstPage_teleseryi(url):
@@ -189,6 +196,42 @@ def firstPage_magtvnaph(url):
             link = None
         if title and link:
             addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), "DefaultFolder.png", 1)
+    return
+
+def firstPage_pinoychannelhd(url):
+    html = getHTML(urllib.unquote_plus(url))
+    # https://bugs.launchpad.net/beautifulsoup/+bug/838022
+    BeautifulSoup.NESTABLE_TAGS['td'] = ['tr', 'table']
+    soup = BeautifulSoup(html)
+    hcnt = 0
+    thumbs = soup.findAll('div','featured-thumbnail')
+    for article in soup.findAll('div','featured-wrap clearfix'):
+        #h2 = article.find('h2', 'title front-view-title')
+        try:
+            title = article.find('a')['title']
+        except:
+            title = "No title"
+        try:
+            link = article.find('a')['href']
+        except:
+            link = None
+        try:
+            #thumbnail = div.find('img')['data-layzr']
+            thumbnail = thumbs[hcnt].find('img')['data-layzr']
+        except:
+            thumbnail = "DefaultFolder.png"
+        hcnt = hcnt + 1
+        if title and link:
+            addPosts(title, link, thumbnail, 0)
+    # Mga lumang mga post
+    olderlinks = soup.find('a', 'next page-numbers')
+    title = "Next Page"
+    try:
+        link = olderlinks.attrs[1][1]
+    except:
+        link = None
+    if title and link:
+        addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), "DefaultFolder.png", 1)
     return
 
 def listPage_teleseryi(url):
@@ -326,17 +369,78 @@ def listPage_magtvnaph(url):
         hcnt = hcnt + 1
     return
 
+def listPage_pinoychannelhd(url):
+    html = getHTML(urllib.unquote_plus(url))
+    soup = BeautifulSoup(html)
+    links = []
+    # Items
+    thumbnail_meta = soup.find('meta', attrs={'property': 'og:image'})
+    try:
+        thumbnail = thumbnail_meta['content']
+    except:
+        thumbnail = "DefaultFolder.png"
+    title_tag = soup.find('title')
+    try:
+        title = title_tag.contents[0]
+    except:
+        title = "no title"
+    iframes = soup.findAll('iframe')
+    hcnt = 0
+    for iframe in iframes:
+        lurl = iframe['src']
+        url = get_vidlink(lurl)
+        links.append(str(url))
+        hcnt = hcnt + 1
+    # if no iframes were extracted, then there is probably a player embedded via js
+    if len(iframes) == 0:
+        files = re.compile('file: \'(.+?.m3u8)\',').findall(html)
+        tcnt = 1
+        for file in files:
+            m3u8 = getHTML(file)
+            tss = re.compile('EXTINF:.....,\n(/.+?)\n').findall(m3u8)
+            xserver = re.compile('^(h.+?://.+?)/').findall(file)
+            newm3u8 = re.sub(',\n/', ',\n' + xserver[0] + '/', m3u8)
+            tfile = 'special://temp/tmp' + str(tcnt) + '.m3u8'
+            f = xbmcvfs.File (tfile, 'w')
+            wres = f.write(newm3u8)
+            tcnt = tcnt + 1
+            f.close()
+            links.append(tfile)
+    if (len(links) > 1):
+        durl = build_url({'url': links, 'mode': 'playAllVideos', 'foldername': title, 'thumbnail': thumbnail, 'title': title})
+        itemname = 'Play All Parts'
+        li = xbmcgui.ListItem(itemname, iconImage=thumbnail)
+        li.setInfo(type="Video",infoLabels={"Title": title, "Plot" : "All parts of" + title})
+        li.setProperty('fanart_image', thumbnail)
+        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=durl, listitem=li)
+    hcnt = 0
+    for link in links:
+        partcnt = hcnt + 1
+        ititle = "Part " + str(partcnt)
+        url = link
+        thumb = thumbnail
+        plot = ititle + ' of ' + title
+        listitem=xbmcgui.ListItem(ititle, iconImage=thumb, thumbnailImage=thumb)
+        listitem.setInfo(type="Video", infoLabels={ "Title": title, "Plot" : plot })
+        listitem.setPath(url)
+        listitem.setProperty("IsPlayable", "true")
+        listitem.setProperty("fanart_image", thumb)
+        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=listitem)
+        hcnt = hcnt + 1
+    return
+
 def get_vidlink(url):
-    vidlink = ''
     match_linksharetv = re.compile('http://www.linkshare.tv/mp4/\?url').findall(url)
     match_linksharetvplay = re.compile('http://www.linkshare.tv/play/\?url').findall(url)
     match_dailymotion = re.compile('www.dailymotion.com').findall(url)
     match_videorss = re.compile('http://videorss.net/mp4/\?url').findall(url)
     match_pinoytvshows = re.compile('www.pinoytvshows.me').findall(url)
     match_youtube = re.compile('www.youtube.com').findall(url)
-    match_vimeo = re.compile('player.vimeo.com').findall(vidlink)
+    match_vimeo = re.compile('player.vimeo.com').findall(url)
+    match_pinoytambayantv = re.compile('pinoytambayantv.to').findall(url)
+    vidlink = ''
     if match_vimeo:
-        vidlink = get_vidlink_vimeo(vidlink)
+        vidlink = get_vidlink_vimeo(url)
     if match_linksharetv:
         vidlink = get_vidlink_linksharetv(url)
     if match_linksharetvplay:
@@ -355,6 +459,8 @@ def get_vidlink(url):
             vidlink = get_vidlink_youtube(vidlink)
     if match_youtube:
         vidlink = get_vidlink_youtube(url)
+    if match_pinoytambayantv:
+        vidlink = get_vidlink_pinoytvshows(url)
     return vidlink
 
 def get_vidlink_dailymotion(url):
