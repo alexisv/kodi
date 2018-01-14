@@ -27,8 +27,10 @@ def getHTML(url):
             response.close()
         except urllib2.HTTPError, e:
             print "HTTP error: %d" % e.code
+            notify("HTTP error: %d" % e.code)
         except urllib2.URLError, e:
             print "Network error: %s" % e.reason.args[1]
+            notify("Network error: %s" % e.reason.args[1])
         else:
             return link
 
@@ -150,19 +152,16 @@ def firstPage_pinoytvshows(url):
 def firstPage_magtvnaph(url):
     firstmatch = re.compile('www.magtvnaph.com$').findall(url)
     absmatch = re.compile('Abs-cbn').findall(url)
-    gmamatch = re.compile('/search/label/Gma%207$').findall(url)
+    gmamatch = re.compile('Gma%207').findall(url)
+    gma_url = 'http://www.magtvnaph.com/search/label/Gma%207'
+    abs_url = 'http://www.magtvnaph.com/search/label/Abs-cbn'
     if firstmatch:
-        gma_url = 'http://www.magtvnaph.com/search/label/Gma%207'
-        abs_url = 'http://www.magtvnaph.com/search/label/Abs-cbn'
         addPosts(str("GMA TV Shows"), gma_url, "DefaultFolder.png", 1)
         addPosts(str("ABS-CBN Shows"), abs_url, "DefaultFolder.png", 1)
     else:
-        html = getHTML(urllib.unquote_plus(url))
-        # https://bugs.launchpad.net/beautifulsoup/+bug/838022
+        html = getHTML(urllib.unquote_plus(str(url)).replace(' ','%20'))
         BeautifulSoup.NESTABLE_TAGS['td'] = ['tr', 'table']
-        notify(html)
         soup = BeautifulSoup(str(html))
-
         for article in soup.findAll('article','post hentry'):
                 h2 = article.find('h2', 'post-title entry-title')
                 try:
@@ -174,17 +173,22 @@ def firstPage_magtvnaph(url):
                 except:
                     link = None
                 try:
-                    div = article.find('div','featured-thumbnail')
-                    try:
-                        thumbnail = div.find('img')['data-layzr']
-                    except:
-                        thumbnail = "DefaultFolder.png"
+                    thumbnail = article.find('img')['src']
                 except:
-                    div = None
                     thumbnail = "DefaultFolder.png"
                 if title and link:
                     addPosts(title, link, thumbnail, 0)
-
+        olderlinks = soup.find('a', 'blog-pager-older-link')
+        try:
+            title = olderlinks.contents[0]
+        except:
+            title = "Older Posts"
+        try:
+            link = olderlinks.attrs[1][1]
+        except:
+            link = None
+        if title and link:
+            addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), "DefaultFolder.png", 1)
     return
 
 def listPage_teleseryi(url):
@@ -277,15 +281,69 @@ def listPage_pinoytvshows(url):
         hcnt = hcnt + 1
     return
 
+def listPage_magtvnaph(url):
+    html = getHTML(urllib.unquote_plus(url))
+    soup = BeautifulSoup(html)
+    links = []
+    # Items
+    thumbnail_meta = soup.find('meta', attrs={'property': 'og:image'})
+    try:
+        thumbnail = thumbnail_meta['content']
+    except:
+        thumbnail = "DefaultFolder.png"
+    title_tag = soup.find('title')
+    try:
+        title = title_tag.contents[0]
+    except:
+        title = "no title"
+    iframes = soup.findAll('iframe')
+    hcnt = 0
+    for iframe in iframes:
+        lurl = iframe['src']
+        url = get_vidlink(lurl)
+        links.append(str(url))
+        hcnt = hcnt + 1
+    if (len(links) > 1):
+        durl = build_url({'url': links, 'mode': 'playAllVideos', 'foldername': title, 'thumbnail': thumbnail, 'title': title})
+        itemname = 'Play All Parts'
+        li = xbmcgui.ListItem(itemname, iconImage=thumbnail)
+        li.setInfo(type="Video",infoLabels={"Title": title, "Plot" : "All parts of" + title})
+        li.setProperty('fanart_image', thumbnail)
+        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=durl, listitem=li)
+    hcnt = 0
+    for iframe in iframes:
+        partcnt = hcnt + 1
+        ititle = "Part " + str(partcnt)
+        url = links[hcnt]
+        thumb = thumbnail
+        plot = ititle + ' of ' + title
+        listitem=xbmcgui.ListItem(ititle, iconImage=thumb, thumbnailImage=thumb)
+        listitem.setInfo(type="Video", infoLabels={ "Title": title, "Plot" : plot })
+        listitem.setPath(url)
+        listitem.setProperty("IsPlayable", "true")
+        listitem.setProperty("fanart_image", thumb)
+        xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]), url=url, listitem=listitem)
+        hcnt = hcnt + 1
+    return
+
 def get_vidlink(url):
     vidlink = ''
     match_linksharetv = re.compile('http://www.linkshare.tv/mp4/\?url').findall(url)
+    match_linksharetvplay = re.compile('http://www.linkshare.tv/play/\?url').findall(url)
     match_dailymotion = re.compile('www.dailymotion.com').findall(url)
     match_videorss = re.compile('http://videorss.net/mp4/\?url').findall(url)
     match_pinoytvshows = re.compile('www.pinoytvshows.me').findall(url)
     match_youtube = re.compile('www.youtube.com').findall(url)
+    match_vimeo = re.compile('player.vimeo.com').findall(vidlink)
+    if match_vimeo:
+        vidlink = get_vidlink_vimeo(vidlink)
     if match_linksharetv:
         vidlink = get_vidlink_linksharetv(url)
+    if match_linksharetvplay:
+        vidlink = get_vidlink_linksharetvplay(url)
+        match_vimeo_in = re.compile('player.vimeo.com').findall(vidlink)
+        if match_vimeo_in:
+            vidlink = get_vidlink_vimeo(vidlink)
     if match_dailymotion:
         vidlink = get_vidlink_dailymotion(url)
     if match_videorss:
@@ -336,10 +394,26 @@ def get_vidlink_linksharetv(url):
     vidlink = urlmatch.group(0)
     return vidlink
 
+def get_vidlink_linksharetvplay(url):
+    html = getHTML(urllib.unquote_plus(url))
+    soup = BeautifulSoup(str(html))
+    iframe = soup.find('iframe')
+    vidlink = iframe['src']
+    return vidlink
+
+def get_vidlink_vimeo(url):
+    match=re.compile('https://player.vimeo.com/video/(.+)\?').findall(url)
+    vid = match[0]
+    vidlink="plugin://plugin.video.vimeo/play/?video_id="+vid
+    return vidlink
+
 def get_vidlink_pinoytvshows(url):
     html = getHTML(urllib.unquote_plus(url))
     match = re.compile('file: "(.+?)"', re.DOTALL).findall(html)
-    vidlink = match[0]
+    try:
+        vidlink = match[0]
+    except:
+        vidlink = ''
     return vidlink
 
 def get_vidlink_youtube(url):
