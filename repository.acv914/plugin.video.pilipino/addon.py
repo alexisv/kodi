@@ -37,8 +37,8 @@ def getHTML(url):
 def firstPage():
     addPosts(str("Mag TV na"), magtvnaph_url, "DefaultFolder.png", 1)
     addPosts(str("Pinoy Channel HD"), pinoychannelhd_url, "DefaultFolder.png", 1)
-    addPosts(str("Pinoy TV Shows"), pinoytvshows_url, "DefaultFolder.png", 1)
-    addPosts(str("Teleseryi"), teleseryi_url, "DefaultFolder.png", 1)
+    #addPosts(str("Pinoy TV Shows"), pinoytvshows_url, "DefaultFolder.png", 1)
+    #addPosts(str("Teleseryi"), teleseryi_url, "DefaultFolder.png", 1)
     return
 
 def sitePage(url):
@@ -51,7 +51,7 @@ def sitePage(url):
     if match_pinoytvshows:
         firstPage_pinoytvshows(url)
     if match_magtvnaph:
-        firstPage_magtvnaph(url)
+        firstPage_newmagtvnaph(url)
     if match_pinoychannelhd:
         firstPage_pinoychannelhd(url)
     return
@@ -76,13 +76,14 @@ def firstPage_teleseryi(url):
     # https://bugs.launchpad.net/beautifulsoup/+bug/838022
     BeautifulSoup.NESTABLE_TAGS['td'] = ['tr', 'table']
     soup = BeautifulSoup(html)
-    thumbs = soup.findAll('div','thumb')
+    #thumbs = soup.findAll('div','thumb')
     lcount = 0
     # Items
-    for links in soup.findAll('h2','post-title entry-title'):
-        script = thumbs[lcount].find('script')
+    for links in soup.findAll('h2','post-title'):
+        #script = thumbs[lcount].find('script')
         try:
-            thumbnail_container = script.contents[0]
+            thumbnail = "DefaultFolder.png"
+            #thumbnail_container = script.contents[0]
         except:
             thumbnail = "DefaultFolder.png"
         try:
@@ -217,7 +218,43 @@ def firstPage_pinoychannelhd(url):
             link = None
         try:
             #thumbnail = div.find('img')['data-layzr']
-            thumbnail = thumbs[hcnt].find('img')['data-layzr']
+            thumbnail = thumbs[hcnt].find('img')['src']
+        except:
+            thumbnail = "DefaultFolder.png"
+        hcnt = hcnt + 1
+        if title and link:
+            addPosts(title, link, thumbnail, 0)
+    # Mga lumang mga post
+    olderlinks = soup.find('a', 'next page-numbers')
+    title = "Next Page"
+    try:
+        link = olderlinks.attrs[1][1]
+    except:
+        link = None
+    if title and link:
+        addPosts(str(title), urllib.quote_plus(link.replace('&amp;','&')), "DefaultFolder.png", 1)
+    return
+
+def firstPage_newmagtvnaph(url):
+    html = getHTML(urllib.unquote_plus(url))
+    # https://bugs.launchpad.net/beautifulsoup/+bug/838022
+    BeautifulSoup.NESTABLE_TAGS['td'] = ['tr', 'table']
+    soup = BeautifulSoup(html)
+    hcnt = 0
+    thumbs = soup.findAll('div','post-image-wrap')
+    for article in soup.findAll('div','post-info'):
+        #h2 = article.find('h2', 'title front-view-title')
+        try:
+            title = article.find('a').contents[0].strip()
+        except:
+            title = "No title"
+        try:
+            link = article.find('a')['href']
+        except:
+            link = None
+        try:
+            #thumbnail = div.find('img')['data-layzr']
+            thumbnail = thumbs[hcnt].find('img')['src']
         except:
             thumbnail = "DefaultFolder.png"
         hcnt = hcnt + 1
@@ -389,6 +426,7 @@ def listPage_pinoychannelhd(url):
     for iframe in iframes:
         lurl = iframe['src']
         url = get_vidlink(lurl)
+        notify(url)
         links.append(str(url))
         hcnt = hcnt + 1
     # if no iframes were extracted, then there is probably a player embedded via js
@@ -438,6 +476,7 @@ def get_vidlink(url):
     match_youtube = re.compile('www.youtube.com').findall(url)
     match_vimeo = re.compile('player.vimeo.com').findall(url)
     match_pinoytambayantv = re.compile('pinoytambayantv.to').findall(url)
+    match_openload = re.compile('openload.co').findall(url)
     vidlink = ''
     if match_vimeo:
         vidlink = get_vidlink_vimeo(url)
@@ -461,6 +500,8 @@ def get_vidlink(url):
         vidlink = get_vidlink_youtube(url)
     if match_pinoytambayantv:
         vidlink = get_vidlink_pinoytvshows(url)
+    if match_openload:
+        vidlink = url
     return vidlink
 
 def get_vidlink_dailymotion(url):
