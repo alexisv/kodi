@@ -158,7 +158,8 @@ def listPage_teleserye(url,useragent,referer):
         except:
             title = "no title"
         conurl = soup.find('iframe')['src']
-        turl = get_vidlink_disklinksharetvplay(conurl,useragent,referer)
+        #turl = get_vidlink_disklinksharetvplay(conurl,useragent,referer)
+        turl = get_vidlink(conurl,useragent,referer)
         links.append(str(turl))
     
     if (len(links) > 0):
@@ -184,6 +185,14 @@ def listPage_teleserye(url,useragent,referer):
         hcnt = hcnt + 1
     return(links)
 
+def get_vidlink(url,useragent,referer):
+    match_linksharetv = re.compile('/linkshare.tv/mp4/').findall(url)
+    if match_linksharetv:
+        vidlink = get_vidlink_linksharetv(url,useragent,referer)
+    else:
+        vidlink = get_vidlink_disklinksharetvplay(url,useragent,referer)
+    return vidlink
+
 def get_vidlink_disklinksharetvplay(url,useragent,referer):
     #notify(referer)
     html = getHTML(urllib.unquote_plus(url),useragent,referer)
@@ -204,6 +213,12 @@ def get_vidlink_disklinksharetvplay(url,useragent,referer):
     f.close()
     #return(newm3u8)
     return(tfile)
+
+def get_vidlink_linksharetv(url,useragent,referer):
+    html = getHTML(urllib.unquote_plus(url),useragent,referer)
+    soup = BeautifulSoup(str(html))
+    vidlink = soup.find('source')['src']
+    return(vidlink)
 
 def getallpages(url,useragent,referer):
     allurls = []
